@@ -8,6 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Capacitor](https://img.shields.io/badge/Capacitor-8-119EFF?style=flat-square&logo=capacitor&logoColor=white)](https://capacitorjs.com/)
 [![Android](https://img.shields.io/badge/Android-API%2024%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](https://developer.android.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > [!IMPORTANT]
 > Windows Electron 版已使用 CH340 + LCUS-1 完成真实硬件控制验证。Android 版已完成 Kotlin 编译、Gradle 构建和 APK 验证，但尚未在真实 Android USB OTG 硬件上执行控制测试。
@@ -55,17 +56,58 @@ Android / Windows / Browser
 
 Android 最低版本为 **Android 7.0（API 24）**。目标设备必须支持 USB Host 或 USB OTG。
 
-## 当前验证记录
+## 下载
 
-| 检查项 | 结果 |
+正式构建版本通过 [GitHub Releases](https://github.com/AbsoluteZero001/USB-Relay-Android/releases) 提供。
+
+Android 用户下载：
+
+```text
+USB-Relay-Android-vX.Y.Z.apk
+```
+
+APK 不通过应用商店分发时，Android 可能提示需要允许当前文件管理器或浏览器“安装未知应用”。请只安装来源明确且校验值匹配的 APK。
+
+## Android 发布状态
+
+| 验证阶段 | 当前状态 |
 | --- | --- |
-| `npm run typecheck` | 通过 |
-| `npm test` | 6 个测试文件、19 个测试通过 |
-| `npm run build` | 通过，包含 Web、Electron main 和 preload |
-| `npx cap sync android` | 通过 |
-| Gradle `assembleDebug` | 通过 |
-| Gradle `lintDebug` | 0 errors |
-| Android 真机 Relay 控制 | 待执行 |
+| Kotlin 编译 | 通过 |
+| Gradle 构建 | 通过 |
+| APK 生成 | 通过（Debug 与未签名 Release） |
+| ADB 真机识别 | HONOR HEY-W09 已验证 |
+| APK 真机安装 | 待验证 |
+| Android USB OTG 识别 CH340 | 待验证 |
+| LCUS-1 Relay ON/OFF 真机控制 | 待验证 |
+
+荣耀平板 8，型号 **HONOR HEY-W09**，已能够被 Android Studio / ADB 识别。ADB 识别不代表 APK 已安装，也不代表 USB OTG 和继电器控制已经通过测试。
+
+## 版本管理
+
+`frontend/package.json` 的 `version` 是项目版本源。
+
+Android 构建会自动读取该版本，并计算：
+
+```text
+versionName = package.json version
+versionCode = major * 10000 + minor * 100 + patch
+```
+
+当前版本：
+
+| 项目 | 值 |
+| --- | --- |
+| `package.json` version | `0.4.0` |
+| Android `versionName` | `0.4.0` |
+| Android `versionCode` | `400` |
+
+版本升级示例：
+
+```text
+0.4.1 -> 401
+0.5.0 -> 500
+1.0.0 -> 10000
+```
 
 ## 已验证硬件
 
@@ -247,6 +289,40 @@ Debug APK 输出路径：
 frontend/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
+### Android Release APK
+
+Release 签名信息从 `frontend/android/keystore.properties` 读取。该文件和真实 keystore 不得提交到 Git。
+
+创建本地配置：
+
+```powershell
+Copy-Item frontend\android\keystore.properties.example frontend\android\keystore.properties
+```
+
+填写以下内容：
+
+```properties
+storeFile=/path/to/your/release.keystore
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+构建签名 Release APK：
+
+```powershell
+cd frontend
+npm run android:release
+```
+
+签名 APK 输出路径：
+
+```text
+frontend/android/app/build/outputs/apk/release/app-release.apk
+```
+
+如果没有 `keystore.properties`，Gradle 会生成 `app-release-unsigned.apk`。未签名包不能作为正式 GitHub Release 发布。
+
 使用 Android Studio 打开原生工程：
 
 ```bash
@@ -265,6 +341,7 @@ npx cap open android
 | `npm run android:sync` | 构建 Web 并同步 Android 工程 |
 | `npm run android:open` | 使用 Android Studio 打开工程 |
 | `npm run android:build` | 构建 Android Debug APK |
+| `npm run android:release` | 构建 Android Release APK |
 | `npm audit` | 检查依赖漏洞 |
 
 ## 串口参数
@@ -285,9 +362,12 @@ npx cap open android
 
 ```text
 USB-Relay-Android/
+├─ .github/workflows/android-release.yml
+├─ LICENSE
 ├─ README.md
 └─ frontend/
    ├─ android/
+   │  ├─ keystore.properties.example
    │  └─ app/src/main/java/com/absolutezero/usbrelay/
    │     ├─ MainActivity.kt
    │     └─ UsbRelayPlugin.kt
@@ -376,14 +456,132 @@ usb-relay-config
 本项目不适用于医疗、消防、生命支持、工业安全联锁等安全关键系统。
 
 使用本项目产生的硬件控制行为及相关风险应由使用者根据实际设备和使用环境自行评估。
-## 开源许可证
+
+## 已知限制
+
+- 仅对 CH340 + LCUS-1 完成了 Windows 实机协议验证。
+- Android APK 已完成构建验证，但 APK 安装、USB OTG 和真实 Relay 控制待验证。
+- LCUS-1 暂无已验证的状态回读协议。
+- 当前未实现 Android 后台常驻、开机启动或 Foreground Service。
+- Release 签名配置已经加入，但正式签名依赖用户自己的 keystore 或 GitHub Actions Secrets。
+- Web Serial 依赖 Chromium 浏览器和安全上下文。
+- 当前使用模板默认应用图标。
+
+## GitHub 发布清单
+
+### 1. 许可证
+
+仓库已经包含标准 MIT License，版权身份为 `AbsoluteZero001`。正式发布时不要替换或删除 `LICENSE`。
+
+### 2. 保护签名密钥
+
+以下文件不得提交到 Git：
+
+```text
+android/local.properties
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+```
+
+GitHub Actions 使用以下 Secrets：
+
+```text
+ANDROID_KEYSTORE_BASE64
+ANDROID_KEYSTORE_PASSWORD
+ANDROID_KEY_ALIAS
+ANDROID_KEY_PASSWORD
+```
+
+工作流不会输出这些值。keystore 只会在构建期间写入临时 runner 目录。
+
+### 3. 配置本地 Release 签名
+
+1. 创建自己的 Android release keystore。
+2. 复制 `frontend/android/keystore.properties.example` 为 `frontend/android/keystore.properties`。
+3. 填入真实路径和密码。
+4. 确认 `git status` 没有显示 `keystore.properties` 或 keystore 文件。
+
+### 4. 版本与 Tag
+
+当前项目版本为 `0.4.0`，推荐发布 Tag：
+
+```text
+v0.4.0
+```
+
+Tag 必须与 `frontend/package.json` 的 `version` 一致，否则 GitHub Actions 会停止发布。
+
+### 5. Release 产物
+
+正式 Release 应提供：
+
+```text
+USB-Relay-Android-v0.4.0.apk
+SHA256SUMS.txt
+```
+
+`app-debug.apk` 只适合内部调试，不能作为正式 GitHub Release 资产。
+
+### 6. GitHub Actions
+
+仓库包含：
+
+```text
+.github/workflows/android-release.yml
+```
+
+推送符合 `v*` 格式的 Tag 后，工作流会执行类型检查、测试、Web/Electron 构建、Capacitor Sync、签名 Release 构建、APK 签名验证、SHA256 计算和 GitHub Release 上传。
+
+### 7. 真实验证状态
+
+在真实设备完成 APK 安装、USB OTG、CH340 识别和 LCUS-1 ON/OFF 控制测试前，必须继续标记为“待验证”。
+
+### 8. 仓库元数据
+
+建议 GitHub Description：
+
+```text
+Android, Windows and Web USB relay controller for CH340 + LCUS-1.
+```
+
+建议 Topics：
+
+```text
+android, capacitor, vue3, electron, kotlin, usb-host, usb-serial, ch340, relay
+```
+
+Android 清单包含 USB Host 能力和 Capacitor 模板的 `INTERNET` 权限。串口控制完全在本机执行，不依赖远程后端。
+
+## 贡献
+
+提交代码前请至少运行：
+
+```bash
+cd frontend
+npm run typecheck
+npm test
+npm run build
+```
+
+涉及 Android 原生代码时，还需要运行：
+
+```bash
+npx cap sync android
+cd android
+./gradlew assembleDebug lintDebug
+```
 
 ## 开源许可证
 
 本项目基于 [MIT License](LICENSE) 开源。
 
-你可以在遵守 MIT License 条款的前提下使用、复制、修改、合并、发布、分发、再许可及销售本项目的软件副本。
+在遵守 MIT License 的版权和许可声明要求的前提下，可以按照 MIT License 使用、复制、修改、合并、发布、分发、再许可和销售软件副本。
 
+```text
 Copyright (c) 2026 AbsoluteZero001
+```
 
 完整许可条款请参阅 [LICENSE](LICENSE)。
