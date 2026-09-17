@@ -34,18 +34,81 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-
-      - name: Install Android SDK packages
+      - name: Set up Android SDK
+        shell: bash
         working-directory: .
-        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+        run: |
+          set -euo pipefail
+
+          export ANDROID_SDK_ROOT="$HOME/android-sdk"
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+
+          curl -fsSL \
+            "https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip" \
+            -o "$RUNNER_TEMP/android-commandlinetools.zip"
+
+          rm -rf "$RUNNER_TEMP/android-commandlinetools"
+          mkdir -p "$RUNNER_TEMP/android-commandlinetools"
+
+          unzip -q \
+            "$RUNNER_TEMP/android-commandlinetools.zip" \
+            -d "$RUNNER_TEMP/android-commandlinetools"
+
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+
+          mv \
+            "$RUNNER_TEMP/android-commandlinetools/cmdline-tools/"* \
+            "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
+
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+
+          "$SDKMANAGER" --version
+
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+
+          "$SDKMANAGER" \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;35.0.0"
+
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/build-tools/35.0.0" >> "$GITHUB_PATH"
+
+      - name: Validate Android SDK
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+
+          test -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$ANDROID_SDK_ROOT/platform-tools/adb"
+          test -x "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner"
+
+          sdkmanager --version
+          adb --version
+          apksigner version
 
       - name: Validate tag and package version
         shell: bash
         working-directory: .
         run: |
           set -euo pipefail
+
           package_version="$(node -p "require('./frontend/package.json').version")"
           tag_version="${GITHUB_REF_NAME#v}"
+
+          echo "Package version: $package_version"
+          echo "Tag version:     $tag_version"
+
           if [ "$package_version" != "$tag_version" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match frontend/package.json version $package_version"
             exit 1
@@ -77,6 +140,7 @@ jobs:
           set -euo pipefail
 
           missing=0
+
           for name in \
             ANDROID_KEYSTORE_BASE64 \
             ANDROID_KEYSTORE_PASSWORD \
@@ -88,12 +152,14 @@ jobs:
               missing=1
             fi
           done
+
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
           printf '%s' "$ANDROID_KEYSTORE_BASE64" \
             | base64 --decode > "$RUNNER_TEMP/release.keystore"
+
           test -s "$RUNNER_TEMP/release.keystore"
 
           {
@@ -102,6 +168,7 @@ jobs:
             printf 'keyAlias=%s\n' "$ANDROID_KEY_ALIAS"
             printf 'keyPassword=%s\n' "$ANDROID_KEY_PASSWORD"
           } > android/keystore.properties
+
           chmod 600 android/keystore.properties
 
       - name: Build signed release APK
@@ -113,18 +180,43 @@ jobs:
         working-directory: .
         run: |
           set -euo pipefail
+
           source_apk="frontend/android/app/build/outputs/apk/release/app-release.apk"
           release_apk="USB-Relay-Android-${GITHUB_REF_NAME}.apk"
 
-          test -f "$source_apk"
+          if [ ! -f "$source_apk" ]; then
+            echo "::error::Release APK was not generated: $source_apk"
+            exit 1
+          fi
+
           sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+
           if [ -z "$sdk_root" ]; then
             echo "::error::Android SDK root is not configured"
             exit 1
           fi
-          "${sdk_root}/build-tools/35.0.0/apksigner" verify --verbose "$source_apk"
+
+          apksigner_path="$sdk_root/build-tools/35.0.0/apksigner"
+
+          if [ ! -x "$apksigner_path" ]; then
+            echo "::error::apksigner was not found: $apksigner_path"
+            exit 1
+          fi
+
+          "$apksigner_path" verify \
+            --verbose \
+            --print-certs \
+            "$source_apk"
+
           cp "$source_apk" "$release_apk"
+
           sha256sum "$release_apk" > SHA256SUMS.txt
+
+          echo "Release APK:"
+          ls -lh "$release_apk"
+
+          echo "SHA-256:"
+          cat SHA256SUMS.txt
 
       - name: Upload GitHub Release
         uses: softprops/action-gh-release@v2
