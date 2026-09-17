@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -98,6 +99,7 @@ jobs:
           apksigner version
 
       - name: Validate tag and package version
+        if: github.event_name == 'push'
         shell: bash
         working-directory: .
         run: |
@@ -173,7 +175,12 @@ jobs:
 
       - name: Build signed release APK
         working-directory: frontend/android
-        run: ./gradlew --no-daemon assembleRelease
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          chmod +x ./gradlew
+          ./gradlew --no-daemon assembleRelease
 
       - name: Verify signature and prepare release files
         shell: bash
@@ -182,7 +189,13 @@ jobs:
           set -euo pipefail
 
           source_apk="frontend/android/app/build/outputs/apk/release/app-release.apk"
-          release_apk="USB-Relay-Android-${GITHUB_REF_NAME}.apk"
+
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            release_apk="USB-Relay-Android-${GITHUB_REF_NAME}.apk"
+          else
+            package_version="$(node -p "require('./frontend/package.json').version")"
+            release_apk="USB-Relay-Android-v${package_version}-test.apk"
+          fi
 
           if [ ! -f "$source_apk" ]; then
             echo "::error::Release APK was not generated: $source_apk"
@@ -218,7 +231,19 @@ jobs:
           echo "SHA-256:"
           cat SHA256SUMS.txt
 
+      - name: Upload test APK artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: USB-Relay-Android-test
+          path: |
+            USB-Relay-Android-v*-test.apk
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload GitHub Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           name: USB Relay Android ${{ github.ref_name }}
