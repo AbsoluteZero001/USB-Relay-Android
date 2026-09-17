@@ -70,15 +70,17 @@ APK 不通过应用商店分发时，Android 可能提示需要允许当前文�
 
 ## Android 发布状态
 
-| 验证阶段 | 当前状态 |
+| 检查项 | 状态 |
 | --- | --- |
-| Kotlin 编译 | 通过 |
-| Gradle 构建 | 通过 |
-| APK 生成 | 通过（Debug 与未签名 Release） |
-| ADB 真机识别 | HONOR HEY-W09 已验证 |
-| APK 真机安装 | 待验证 |
-| Android USB OTG 识别 CH340 | 待验证 |
-| LCUS-1 Relay ON/OFF 真机控制 | 待验证 |
+| Kotlin 编译 | ✅ 已验证 |
+| Gradle Debug 构建 | ✅ 已验证 |
+| Gradle Release 构建 | ✅ 已验证 |
+| Release APK 签名 | ✅ 已验证 |
+| HONOR HEY-W09 ADB 真机连接 | ✅ 已验证 |
+| Release APK 真机安装 | ✅ 已验证 |
+| Android App 真机启动 | ✅ 已验证 |
+| Android USB OTG + CH340 | ⏳ 待验证 |
+| LCUS-1 Relay ON/OFF | ⏳ 待验证 |
 
 荣耀平板 8，型号 **HONOR HEY-W09**，已能够被 Android Studio / ADB 识别。ADB 识别不代表 APK 已安装，也不代表 USB OTG 和继电器控制已经通过测试。
 

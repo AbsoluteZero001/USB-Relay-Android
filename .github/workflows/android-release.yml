@@ -131,8 +131,10 @@ jobs:
       - name: Upload GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: USB Relay Android ${{ github.ref_name }}
           files: |
             USB-Relay-Android-${{ github.ref_name }}.apk
             SHA256SUMS.txt
           fail_on_unmatched_files: true
           generate_release_notes: true
+          prerelease: true
