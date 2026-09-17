@@ -233,7 +233,7 @@ jobs:
 
       - name: Upload test APK artifact
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: USB-Relay-Android-test
           path: |
