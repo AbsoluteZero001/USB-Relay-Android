@@ -10,8 +10,15 @@ htmlcov/
 
 # Configuration and logs
 .env
+.env.*
 !.env.example
 *.log
+
+# Android signing and local configuration
+*.jks
+*.keystore
+keystore.properties
+local.properties
 
 # Node
 node_modules/
